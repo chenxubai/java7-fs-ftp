@@ -79,12 +79,14 @@ public final class FtpAgentQueue
     public FtpAgent getAgent()
         throws IOException
     {
+
         if (!initialized.getAndSet(true))
             fillQueue();
         try {
             FtpAgent agent = queue.take();
-            if (agent.isDead())
-                agent = factory.get(this, cfg);
+            if (agent.isDead()) {
+            	agent = factory.get(this, cfg);
+            }
             agent.connect();
             return agent;
         } catch (InterruptedException e) {
