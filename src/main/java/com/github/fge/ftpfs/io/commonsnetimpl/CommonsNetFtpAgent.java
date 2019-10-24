@@ -44,13 +44,15 @@ public final class CommonsNetFtpAgent
     extends AbstractFtpAgent
 {
     private final FTPClient ftpClient;
-
+    private final FtpAgentQueue queue;
+    
     public CommonsNetFtpAgent(final FtpAgentQueue queue,
         final FtpConfiguration cfg)
     {
         super(queue, cfg);
         ftpClient = new FTPClient();
         ftpClient.setAutodetectUTF8(true);
+        this.queue = queue;
     }
 
     @Override
@@ -59,17 +61,31 @@ public final class CommonsNetFtpAgent
     {
         try {
             ftpClient.setFileType(FTP.ASCII_FILE_TYPE);
-            final FTPFile[] files = ftpClient.listFiles(name);
-            if (files.length == 0)
-                throw new NoSuchFileException(name);
-            if (files.length == 1)
-                return new CommonsNetFtpFileView(files[0]);
-            for (final FTPFile file: files)
-                if (".".equals(file.getName()))
-                    return new CommonsNetFtpFileView(file);
-            throw new IllegalStateException();
+//            final FTPFile[] files = ftpClient.listFiles(name);
+//            if (files.length == 0)
+//                throw new NoSuchFileException(name);
+//            if (files.length == 1)
+//                return new CommonsNetFtpFileView(files[0]);
+//            for (final FTPFile file: files)
+//                if (".".equals(file.getName()))
+//                    return new CommonsNetFtpFileView(file);
+//            //对于目录也需要获取 FtpFileView ，先回上级目录，然后在上级目录list，目的就是找获取参数传进来的这个目录的FTPFile
+//            String parentString = name.substring(0, name.lastIndexOf("/"));
+//			FTPFile[] listDirectories = ftpClient.listDirectories(parentString);
+//          
+//            for(FTPFile ftpFile : listDirectories) {
+//            	if(ftpFile.isDirectory() && (parentString+"/"+ftpFile.getName()).contentEquals(name)) {
+//            		ftpClient.changeWorkingDirectory(name);
+//            		return new CommonsNetFtpFileView(ftpFile);
+//            	}
+//            }
+            
+//            throw new IllegalStateException("name["+name+"] files.length["+files.length+"], listDirectories.length["+listDirectories.length+"], parent["+parentString+"]");
+            FTPFile mlistFile = ftpClient.mlistFile(name);
+            return new CommonsNetFtpFileView(mlistFile);
         } catch (FTPConnectionClosedException e) {
             status = Status.DEAD;
+            queue.pushBack(this);
             throw new IOException("service unavailable", e);
         }
     }
@@ -91,6 +107,7 @@ public final class CommonsNetFtpAgent
             throw new IllegalStateException();
         } catch (FTPConnectionClosedException e) {
             status = Status.DEAD;
+            queue.pushBack(this);
             throw new IOException("service unavailable", e);
         }
     }
@@ -111,11 +128,12 @@ public final class CommonsNetFtpAgent
             for (final FTPFile file: files) {
                 name = file.getName();
                 if (!(".".equals(name) || "..".equals(name)))
-                    ret.add(name);
+                    ret.add(dir+"/"+name);//edit by chenxu 2019-09-27
             }
             return ret;
         } catch (FTPConnectionClosedException e) {
             status = Status.DEAD;
+            queue.pushBack(this);
             throw new IOException("service unavailable", e);
         }
     }
@@ -133,7 +151,7 @@ public final class CommonsNetFtpAgent
                 throw new IOException(file + " is a directory");
             if (files[0].isDirectory())
                 throw new AccessDeniedException(file);
-            ftpClient.setFileType(FTP.BINARY_FILE_TYPE);
+            ftpClient.setFileType(FTP.ASCII_FILE_TYPE);
             final InputStream ret = ftpClient.retrieveFileStream(file);
             if (ret == null)
                 throw new IOException("cannot open stream to file (server " +
@@ -141,6 +159,7 @@ public final class CommonsNetFtpAgent
             return ret;
         } catch (FTPConnectionClosedException e) {
             status = Status.DEAD;
+            queue.pushBack(this);
             throw new IOException("service unavailable", e);
         }
     }
@@ -158,6 +177,7 @@ public final class CommonsNetFtpAgent
                     + ftpClient.getReplyCode());
         } catch (FTPConnectionClosedException e) {
             status = Status.DEAD;
+            queue.pushBack(this);
             throw new IOException("service unavailable", e);
         } catch (IOException e) {
             status = Status.DEAD;
