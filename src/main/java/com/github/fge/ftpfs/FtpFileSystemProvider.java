@@ -283,7 +283,7 @@ public final class FtpFileSystemProvider
     public void checkAccess(final Path path, final AccessMode... modes)
         throws IOException
     {
-        final FtpAgentQueue queue = agentQueues.get(path.getFileSystem());
+    	final FtpAgentQueue queue = agentQueues.get(path.getFileSystem());
         final String name = path.toRealPath().toString();
         final List<AccessMode> modeList = Arrays.asList(modes);
         try (
@@ -312,10 +312,10 @@ public final class FtpFileSystemProvider
             final FtpAgent agent = queue.getAgent();
         ) {
             final FtpFileView view = agent.getFileView(name);
-            return type.isAssignableFrom(view.getClass()) ? type.cast(view)
-                : null;
+            return type.isAssignableFrom(view.getClass()) ? type.cast(view) : null;
         } catch (IOException e) {
-            // FIXME
+        	e.printStackTrace();
+        	// FIXME
             return null;
         }
     }
